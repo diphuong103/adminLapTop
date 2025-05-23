@@ -21,6 +21,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import com.example.adminlaptopapp.R
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -215,7 +216,7 @@ fun ChatListItemView(chat: ChatListItem, onClick: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically
     ) {
         AsyncImage(
-            model = chat.otherUserAvatarUrl.ifBlank { null },
+            model = chat.otherUserAvatarUrl.takeIf { it.isNotBlank() } ?: R.drawable.default_avatar,
             contentDescription = "Ảnh đại diện ${chat.otherUserName}",
             modifier = Modifier
                 .size(56.dp)

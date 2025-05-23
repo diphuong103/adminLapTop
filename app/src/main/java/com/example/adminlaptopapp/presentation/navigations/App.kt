@@ -2,6 +2,7 @@ package com.example.adminlaptopapp.presentation.navigations
 
 import android.annotation.SuppressLint
 import android.net.Uri
+import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.horizontalScroll
@@ -350,14 +351,12 @@ fun App(
                     val chatItems by chatViewModel.chatList.collectAsState()
                     val searchQuery by chatViewModel.searchQuery.collectAsState()
                     val isLoading by chatViewModel.isLoading.collectAsState()
-                    val currentUserId = FirebaseAuth.getInstance().currentUser?.uid ?: ""
 
-                    // Load chat list when screen is first created
-                    LaunchedEffect(currentUserId) {
-                        if (currentUserId.isNotEmpty()) {
-                            chatViewModel.loadChatList()
-                        }
+
+                    LaunchedEffect(Unit) {
+                        chatViewModel.loadChatList()
                     }
+
 
                     ChatListScreen(
                         chatItems = chatItems,
@@ -368,7 +367,7 @@ fun App(
                         onChatClicked = { chatId, otherUserId ->
                             navController.navigate(
                                 Routes.ChatScreen(
-                                    userId = currentUserId,
+                                    userId = otherUserId,
                                     chatRoomId = chatId
                                 )
                             )

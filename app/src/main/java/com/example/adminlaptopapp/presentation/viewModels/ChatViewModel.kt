@@ -8,11 +8,18 @@ import com.example.adminlaptopapp.domain.models.UserChat
 import com.example.adminlaptopapp.presentation.screens.Chat.ChatListItem
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.*
+import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import javax.inject.Inject
 
-class ChatViewModel : ViewModel() {
+@HiltViewModel
+class ChatViewModel  @Inject constructor() :  ViewModel() {
+
+    init {
+        Log.d("ChatViewModel", "ViewModel created")
+    }
 
     private val _chatList = MutableStateFlow<List<ChatListItem>>(emptyList())
     val chatList: StateFlow<List<ChatListItem>> = _chatList
@@ -114,6 +121,7 @@ class ChatViewModel : ViewModel() {
                                         }
 
                                         val avatarUrl = userSnap.child("profileImage").getValue(String::class.java) ?: ""
+
 
                                         Log.d("ChatViewModel", "User info - Name: $displayName, Avatar: $avatarUrl")
 
@@ -260,16 +268,15 @@ class ChatViewModel : ViewModel() {
     }
 
     fun markMessagesAsRead(clientId: String) {
-        val currentUserId = FirebaseAuth.getInstance().currentUser?.uid ?: return
+        val currentUserId = FirebaseAuth.getInstance().currentUser?.uid ?: adminId
 
         db.child("chats").child(clientId).child("messages")
             .addListenerForSingleValueEvent(object : ValueEventListener {
                 override fun onDataChange(snapshot: DataSnapshot) {
                     for (msgSnap in snapshot.children) {
                         val message = msgSnap.getValue(ChatMessage::class.java)
-                        // Chỉ đánh dấu tin nhắn từ client (không phải admin) và chưa đọc
                         if (message != null
-                            && message.senderId == clientId  // Tin nhắn từ client
+                            && message.senderId == clientId
                             && message.isRead == false
                         ) {
                             msgSnap.ref.child("isRead").setValue(true)
@@ -283,8 +290,10 @@ class ChatViewModel : ViewModel() {
             })
     }
 
+    private val adminId = "admin"
+
     fun sendMessage(text: String, imageUrl: String?) {
-        val currentUserId = FirebaseAuth.getInstance().currentUser?.uid ?: return
+        val currentUserId = FirebaseAuth.getInstance().currentUser?.uid ?: adminId
         if (currentChatWithUserId.isEmpty()) return
         if (text.isBlank() && imageUrl.isNullOrBlank()) return
 
@@ -292,7 +301,7 @@ class ChatViewModel : ViewModel() {
             db.child("chats").child(currentChatWithUserId).child("messages").push().key ?: return
         val message = ChatMessage(
             id = messageId,
-            senderId = currentUserId, // Admin gửi
+            senderId = currentUserId,
             text = text.trim(),
             urlIMG = imageUrl ?: "",
             timestamp = System.currentTimeMillis(),

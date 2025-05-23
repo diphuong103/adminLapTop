@@ -25,23 +25,20 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import coil.compose.rememberAsyncImagePainter
+import com.example.adminlaptopapp.R
 import com.example.adminlaptopapp.domain.models.ChatMessage
 import com.example.adminlaptopapp.presentation.viewModels.ChatViewModel
 import kotlinx.coroutines.launch
-import okhttp3.Call
-import okhttp3.Callback
-import okhttp3.FormBody
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import okhttp3.Response
-import org.json.JSONObject
-import java.io.IOException
+import java.util.*
+import com.example.adminlaptopapp.utils.formatTimestamp
+
 
 @Composable
 fun ChatScreenRoute(
@@ -58,11 +55,6 @@ fun ChatScreenRoute(
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         selectedImageUri = uri
     }
-
-//    // Initialize chat room
-//    LaunchedEffect(chatRoomId) {
-//        chatViewModel.initializeChatRoom(chatRoomId)
-//    }
 
     ChatScreen(
         userName = otherUser?.displayName ?: "Unknown User",
@@ -91,11 +83,19 @@ fun ChatScreen(
     onSendMessage: (text: String, imageUri: Uri?) -> Unit,
     onSelectImage: () -> Unit,
     selectedImageUri: Uri?,
-    onClearSelectedImage: () -> Unit
+    onClearSelectedImage: () -> Unit,
+    chatViewModel: ChatViewModel = hiltViewModel()
 ) {
     var inputText by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
+
+    LaunchedEffect(currentUserId) {
+        chatViewModel.loadMessages(currentUserId)
+    }
+
+    val messages by chatViewModel.messages.collectAsState()
+    val otherUser by chatViewModel.otherUser.collectAsState()
 
     // Auto scroll to bottom when new message arrives
     LaunchedEffect(messages.size) {
@@ -112,8 +112,8 @@ fun ChatScreen(
                 title = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         AsyncImage(
-                            model = userImageUrl.ifBlank { null },
-                            contentDescription = "Avatar",
+                            model = if (userImageUrl.isNotBlank()) userImageUrl else R.drawable.default_avatar,
+                                    contentDescription = "Avatar",
                             modifier = Modifier
                                 .size(36.dp)
                                 .clip(CircleShape)
@@ -150,7 +150,7 @@ fun ChatScreen(
                 items(messages) { message ->
                     MessageBubble(
                         message = message,
-                        isMe = message.senderId == currentUserId
+                        isMe = message.senderId == "admin" // Admin messages on right
                     )
                 }
             }
@@ -255,92 +255,22 @@ fun ChatScreen(
             }
         }
     }
-
-    @Composable
-    fun MessageBubble(message: ChatMessage, isMe: Boolean) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 4.dp),
-            horizontalArrangement = if (isMe) Arrangement.End else Arrangement.Start
-        ) {
-            Card(
-                modifier = Modifier.widthIn(max = 280.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = if (isMe) {
-                        MaterialTheme.colorScheme.primary
-                    } else {
-                        MaterialTheme.colorScheme.surfaceVariant
-                    }
-                ),
-                shape = RoundedCornerShape(
-                    topStart = 16.dp,
-                    topEnd = 16.dp,
-                    bottomStart = if (isMe) 16.dp else 4.dp,
-                    bottomEnd = if (isMe) 4.dp else 16.dp
-                )
-            ) {
-                Column(modifier = Modifier.padding(12.dp)) {
-                    // Image message
-                    if (message.urlIMG.isNotBlank()) {
-                        Image(
-                            painter = rememberAsyncImagePainter(message.urlIMG),
-                            contentDescription = "Image message",
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .heightIn(min = 100.dp, max = 200.dp)
-                                .clip(RoundedCornerShape(8.dp)),
-                            contentScale = ContentScale.Crop
-                        )
-                        if (message.text.isNotBlank()) {
-                            Spacer(modifier = Modifier.height(8.dp))
-                        }
-                    }
-
-                    // Text message
-                    if (message.text.isNotBlank()) {
-                        Text(
-                            text = message.text,
-                            color = if (isMe) {
-                                MaterialTheme.colorScheme.onPrimary
-                            } else {
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                            }
-                        )
-                    }
-
-                    // Timestamp
-                    Text(
-                        text = java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault())
-                            .format(java.util.Date(message.timestamp)),
-                        style = MaterialTheme.typography.labelSmall,
-                        modifier = Modifier.align(Alignment.End),
-                        color = if (isMe) {
-                            MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.7f)
-                        } else {
-                            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                        }
-                    )
-                }
-            }
-        }
-    }
 }
 
 @Composable
 fun MessageBubble(message: ChatMessage, isMe: Boolean) {
-    val timeText = formatTimestamp(message.timestamp)
 
+    val timeText = formatTimestamp(timestamp = message.timestamp)
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 4.dp, horizontal = 8.dp),
-        horizontalArrangement = if (isMe) Arrangement.Start else Arrangement.End
+        horizontalArrangement = if (isMe) Arrangement.End else Arrangement.Start
     ) {
         if (!isMe) {
             Image(
-                painter = rememberAsyncImagePainter("https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSHavAqEKhY8MRX7NntKRnkGqFTk42uJT_TuA&s"),
-                contentDescription = "Support Avatar",
+                painter = painterResource(id = R.drawable.default_avatar),
+                contentDescription = "Client Avatar",
                 modifier = Modifier
                     .size(32.dp)
                     .clip(CircleShape)
@@ -353,15 +283,15 @@ fun MessageBubble(message: ChatMessage, isMe: Boolean) {
             modifier = Modifier.widthIn(max = 280.dp),
             colors = CardDefaults.cardColors(
                 containerColor = if (isMe)
-                    MaterialTheme.colorScheme.primary
+                    MaterialTheme.colorScheme.primary  // Admin messages
                 else
-                    MaterialTheme.colorScheme.surfaceVariant
+                    MaterialTheme.colorScheme.surfaceVariant  // Client messages
             ),
             shape = RoundedCornerShape(16.dp),
             elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
         ) {
             if (message.urlIMG.isNotBlank()) {
-                Box {
+                Column {
                     Image(
                         painter = rememberAsyncImagePainter(model = message.urlIMG),
                         contentDescription = "Hình ảnh đã gửi",
@@ -371,23 +301,31 @@ fun MessageBubble(message: ChatMessage, isMe: Boolean) {
                             .clip(RoundedCornerShape(16.dp)),
                         contentScale = ContentScale.Crop
                     )
-                    // Nếu muốn overlay text trên ảnh có thể thêm ở đây
+
+                    if (message.text.isNotBlank()) {
+                        Text(
+                            text = message.text,
+                            color = if (isMe)
+                                MaterialTheme.colorScheme.onPrimary
+                            else
+                                MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                        )
+                    }
+
+                    Text(
+                        text = timeText,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = if (isMe)
+                            MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.7f)
+                        else
+                            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                        modifier = Modifier
+                            .padding(horizontal = 12.dp, vertical = 4.dp)
+                            .align(Alignment.End)
+                    )
                 }
-
-                Spacer(modifier = Modifier.height(4.dp))
-
-                Text(
-                    text = timeText,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = if (isMe)
-                        MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.7f)
-                    else
-                        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                    modifier = Modifier
-                        .padding(horizontal = 12.dp, vertical = 4.dp)
-                        .align(Alignment.End)
-                )
-
             } else {
                 Column(modifier = Modifier.padding(12.dp)) {
                     if (message.text.isNotBlank()) {
@@ -416,6 +354,7 @@ fun MessageBubble(message: ChatMessage, isMe: Boolean) {
             }
         }
 
+        // Add spacing on the right for admin messages
         if (isMe) {
             Spacer(modifier = Modifier.width(8.dp))
         }
@@ -423,33 +362,5 @@ fun MessageBubble(message: ChatMessage, isMe: Boolean) {
 }
 
 
-fun uploadImageToImgBB(context: Context, uri: Uri, onSuccess: (String) -> Unit) {
-    val apiKey = "cfb88fd6087fa222b489b186dff8c38d"
 
-    val inputStream = context.contentResolver.openInputStream(uri)
-    val bytes = inputStream?.readBytes()
-    val encoded = android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP)
 
-    val client = OkHttpClient()
-    val requestBody = FormBody.Builder()
-        .add("key", apiKey)
-        .add("image", encoded)
-        .build()
-
-    val request = Request.Builder()
-        .url("https://api.imgbb.com/1/upload")
-        .post(requestBody)
-        .build()
-
-    client.newCall(request).enqueue(object : Callback {
-        override fun onFailure(call: Call, e: IOException) {}
-
-        override fun onResponse(call: Call, response: Response) {
-            response.body?.string()?.let { body ->
-                val json = JSONObject(body)
-                val url = json.getJSONObject("data").getString("url")
-                onSuccess(url)
-            }
-        }
-    })
-}
