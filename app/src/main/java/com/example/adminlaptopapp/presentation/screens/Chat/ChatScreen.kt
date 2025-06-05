@@ -47,13 +47,24 @@ fun ChatScreenRoute(
     navController: NavController,
     chatViewModel: ChatViewModel = hiltViewModel()
 ) {
+    val context = LocalContext.current
     val messages by chatViewModel.messages.collectAsState()
     val otherUser by chatViewModel.otherUser.collectAsState()
+    val isUploadingImage by chatViewModel.isUploadingImage.collectAsState()
+    val error by chatViewModel.error.collectAsState()
 
     var selectedImageUri by remember { mutableStateOf<Uri?>(null) }
 
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         selectedImageUri = uri
+    }
+
+    // Hiển thị error nếu có
+    error?.let { errorMessage ->
+        LaunchedEffect(errorMessage) {
+            // Bạn có thể hiển thị Snackbar hoặc Dialog ở đây
+            chatViewModel.clearError()
+        }
     }
 
     ChatScreen(
@@ -63,12 +74,14 @@ fun ChatScreenRoute(
         currentUserId = userId,
         onBackPressed = { navController.navigateUp() },
         onSendMessage = { text, imageUri ->
-            chatViewModel.sendMessage(text, imageUri?.toString())
+            chatViewModel.sendMessage(context, text, imageUri)
             selectedImageUri = null
         },
         onSelectImage = { launcher.launch("image/*") },
         selectedImageUri = selectedImageUri,
-        onClearSelectedImage = { selectedImageUri = null }
+        onClearSelectedImage = { selectedImageUri = null },
+        isUploadingImage = isUploadingImage,
+        error = error
     )
 }
 
@@ -84,6 +97,8 @@ fun ChatScreen(
     onSelectImage: () -> Unit,
     selectedImageUri: Uri?,
     onClearSelectedImage: () -> Unit,
+    isUploadingImage: Boolean = false,
+    error: String? = null,
     chatViewModel: ChatViewModel = hiltViewModel()
 ) {
     var inputText by remember { mutableStateOf("") }
@@ -113,7 +128,7 @@ fun ChatScreen(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         AsyncImage(
                             model = if (userImageUrl.isNotBlank()) userImageUrl else R.drawable.default_avatar,
-                                    contentDescription = "Avatar",
+                            contentDescription = "Avatar",
                             modifier = Modifier
                                 .size(36.dp)
                                 .clip(CircleShape)
@@ -140,6 +155,25 @@ fun ChatScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
+            // Hiển thị lỗi nếu có
+            error?.let { errorMessage ->
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.errorContainer
+                    )
+                ) {
+                    Text(
+                        text = errorMessage,
+                        color = MaterialTheme.colorScheme.onErrorContainer,
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(12.dp)
+                    )
+                }
+            }
+
             // Messages list
             LazyColumn(
                 state = listState,
@@ -198,6 +232,35 @@ fun ChatScreen(
                 }
             }
 
+            // Hiển thị trạng thái upload
+            if (isUploadingImage) {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant
+                    )
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(24.dp),
+                            strokeWidth = 2.dp
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text(
+                            text = "Đang upload hình ảnh...",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
+                }
+            }
+
             // Message input area
             Surface(
                 modifier = Modifier.fillMaxWidth(),
@@ -213,6 +276,7 @@ fun ChatScreen(
                     // Image selection button
                     IconButton(
                         onClick = onSelectImage,
+                        enabled = !isUploadingImage,
                         modifier = Modifier
                             .size(48.dp)
                             .background(
@@ -235,7 +299,8 @@ fun ChatScreen(
                         modifier = Modifier.weight(1f),
                         placeholder = { Text("Nhập tin nhắn...") },
                         maxLines = 4,
-                        shape = RoundedCornerShape(24.dp)
+                        shape = RoundedCornerShape(24.dp),
+                        enabled = !isUploadingImage
                     )
 
                     Spacer(modifier = Modifier.width(8.dp))
@@ -247,9 +312,21 @@ fun ChatScreen(
                                 inputText = ""
                             }
                         },
-                        modifier = Modifier.size(48.dp)
+                        modifier = Modifier.size(48.dp),
+                        containerColor = if (isUploadingImage)
+                            MaterialTheme.colorScheme.surfaceVariant
+                        else
+                            MaterialTheme.colorScheme.primary
                     ) {
-                        Icon(Icons.Filled.Send, contentDescription = "Send")
+                        if (isUploadingImage) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(24.dp),
+                                strokeWidth = 2.dp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        } else {
+                            Icon(Icons.Filled.Send, contentDescription = "Send")
+                        }
                     }
                 }
             }

@@ -1,11 +1,14 @@
 package com.example.adminlaptopapp.presentation.viewModels
 
+import android.content.Context
+import android.net.Uri
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.adminlaptopapp.domain.models.ChatMessage
 import com.example.adminlaptopapp.domain.models.UserChat
 import com.example.adminlaptopapp.presentation.screens.Chat.ChatListItem
+import com.example.adminlaptopapp.presentation.utils.ImageUploadHelper
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.*
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -15,7 +18,7 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
-class ChatViewModel  @Inject constructor() :  ViewModel() {
+class ChatViewModel @Inject constructor() : ViewModel() {
 
     init {
         Log.d("ChatViewModel", "ViewModel created")
@@ -39,9 +42,14 @@ class ChatViewModel  @Inject constructor() :  ViewModel() {
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error
 
+    // Thêm state cho việc upload hình ảnh
+    private val _isUploadingImage = MutableStateFlow(false)
+    val isUploadingImage: StateFlow<Boolean> = _isUploadingImage
+
     private val db = FirebaseDatabase.getInstance().reference
     private var currentChatWithUserId: String = ""
     private var messagesListener: ValueEventListener? = null
+    private val imageUploadHelper = ImageUploadHelper()
 
     fun updateSearchQuery(query: String) {
         _searchQuery.value = query
@@ -121,7 +129,6 @@ class ChatViewModel  @Inject constructor() :  ViewModel() {
                                         }
 
                                         val avatarUrl = userSnap.child("profileImage").getValue(String::class.java) ?: ""
-
 
                                         Log.d("ChatViewModel", "User info - Name: $displayName, Avatar: $avatarUrl")
 
@@ -292,30 +299,63 @@ class ChatViewModel  @Inject constructor() :  ViewModel() {
 
     private val adminId = "admin"
 
-    fun sendMessage(text: String, imageUrl: String?) {
+    // Cập nhật hàm sendMessage để upload hình ảnh trước khi gửi
+    fun sendMessage(context: Context, text: String, imageUri: Uri?) {
         val currentUserId = FirebaseAuth.getInstance().currentUser?.uid ?: adminId
         if (currentChatWithUserId.isEmpty()) return
-        if (text.isBlank() && imageUrl.isNullOrBlank()) return
+        if (text.isBlank() && imageUri == null) return
 
-        val messageId =
-            db.child("chats").child(currentChatWithUserId).child("messages").push().key ?: return
-        val message = ChatMessage(
-            id = messageId,
-            senderId = currentUserId,
-            text = text.trim(),
-            urlIMG = imageUrl ?: "",
-            timestamp = System.currentTimeMillis(),
-            isRead = false
-        )
+        viewModelScope.launch {
+            try {
+                var imageUrl: String? = null
 
-        db.child("chats").child(currentChatWithUserId).child("messages").child(messageId)
-            .setValue(message)
-            .addOnSuccessListener {
-                Log.d("ChatViewModel", "Message sent successfully")
+                // Nếu có hình ảnh, upload lên ImgBB trước
+                if (imageUri != null) {
+                    _isUploadingImage.value = true
+
+                    val uploadResult = imageUploadHelper.uploadImageToImgBB(context, imageUri)
+
+                    if (uploadResult.isSuccess) {
+                        imageUrl = uploadResult.getOrNull()
+                        Log.d("ChatViewModel", "Image uploaded successfully: $imageUrl")
+                    } else {
+                        Log.e("ChatViewModel", "Image upload failed", uploadResult.exceptionOrNull())
+                        _error.value = "Lỗi khi upload hình ảnh: ${uploadResult.exceptionOrNull()?.message}"
+                        _isUploadingImage.value = false
+                        return@launch
+                    }
+
+                    _isUploadingImage.value = false
+                }
+
+                // Gửi tin nhắn với URL hình ảnh (nếu có)
+                val messageId = db.child("chats").child(currentChatWithUserId).child("messages").push().key ?: return@launch
+
+                val message = ChatMessage(
+                    id = messageId,
+                    senderId = currentUserId,
+                    text = text.trim(),
+                    urlIMG = imageUrl ?: "",
+                    timestamp = System.currentTimeMillis(),
+                    isRead = false
+                )
+
+                db.child("chats").child(currentChatWithUserId).child("messages").child(messageId)
+                    .setValue(message)
+                    .addOnSuccessListener {
+                        Log.d("ChatViewModel", "Message sent successfully")
+                    }
+                    .addOnFailureListener { e ->
+                        Log.e("ChatViewModel", "Error sending message", e)
+                        _error.value = "Lỗi khi gửi tin nhắn: ${e.message}"
+                    }
+
+            } catch (e: Exception) {
+                Log.e("ChatViewModel", "Exception in sendMessage", e)
+                _error.value = "Lỗi không xác định: ${e.message}"
+                _isUploadingImage.value = false
             }
-            .addOnFailureListener { e ->
-                Log.e("ChatViewModel", "Error sending message", e)
-            }
+        }
     }
 
     fun clearError() {

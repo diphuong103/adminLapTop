@@ -1,5 +1,6 @@
 package com.example.adminlaptopapp.presentation.screens.Chat
 
+import android.annotation.SuppressLint
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -14,6 +15,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -36,6 +38,7 @@ data class ChatListItem(
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
+@SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
 @Composable
 fun ChatListScreen(
     chatItems: List<ChatListItem>,
@@ -47,149 +50,164 @@ fun ChatListScreen(
     onRetry: () -> Unit = {},
     onClearError: () -> Unit = {}
 ) {
-    Column(modifier = Modifier.fillMaxSize()) {
-        // Search bar
-        OutlinedTextField(
-            value = searchQuery,
-            onValueChange = onSearchQueryChange,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            placeholder = { Text("Tìm kiếm người dùng") },
-            singleLine = true,
-            keyboardOptions = KeyboardOptions.Default.copy(imeAction = ImeAction.Search),
-            keyboardActions = KeyboardActions(onSearch = {
-                // Handle search action if needed
-            }),
-            colors = TextFieldDefaults.outlinedTextFieldColors(),
-            enabled = !isLoading
-        )
 
-        // Error handling
-        error?.let { errorMessage ->
-            Card(
+
+    val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior(rememberTopAppBarState())
+
+    Scaffold(
+        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+        topBar = {
+            TopAppBar(
+                title = { Text(text = "Danh sách Chat Client", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold) },
+                scrollBehavior = scrollBehavior
+            )
+        }
+    ) {
+             innerPadding ->
+        Column(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
+            // Search bar
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = onSearchQueryChange,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.errorContainer
-                )
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp)
-                ) {
-                    Text(
-                        text = "Có lỗi xảy ra",
-                        style = MaterialTheme.typography.titleSmall,
-                        color = MaterialTheme.colorScheme.onErrorContainer,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = errorMessage,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onErrorContainer
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Row {
-                        TextButton(
-                            onClick = {
-                                onClearError()
-                                onRetry()
-                            }
-                        ) {
-                            Text("Thử lại")
-                        }
-                        Spacer(modifier = Modifier.width(8.dp))
-                        TextButton(onClick = onClearError) {
-                            Text("Đóng")
-                        }
-                    }
-                }
-            }
-        }
+                    .padding(16.dp),
+                placeholder = { Text("Tìm kiếm người dùng") },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions.Default.copy(imeAction = ImeAction.Search),
+                keyboardActions = KeyboardActions(onSearch = {
+                    // Handle search action if needed
+                }),
+                colors = TextFieldDefaults.outlinedTextFieldColors(),
+                enabled = !isLoading
+            )
 
-        when {
-            isLoading -> {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
+            // Error handling
+            error?.let { errorMessage ->
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.errorContainer
+                    )
                 ) {
                     Column(
-                        horizontalAlignment = Alignment.CenterHorizontally
+                        modifier = Modifier.padding(16.dp)
                     ) {
-                        CircularProgressIndicator()
-                        Spacer(modifier = Modifier.height(16.dp))
                         Text(
-                            text = "Đang tải danh sách chat...",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = Color.Gray
+                            text = "Có lỗi xảy ra",
+                            style = MaterialTheme.typography.titleSmall,
+                            color = MaterialTheme.colorScheme.onErrorContainer,
+                            fontWeight = FontWeight.Bold
                         )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = errorMessage,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onErrorContainer
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row {
+                            TextButton(
+                                onClick = {
+                                    onClearError()
+                                    onRetry()
+                                }
+                            ) {
+                                Text("Thử lại")
+                            }
+                            Spacer(modifier = Modifier.width(8.dp))
+                            TextButton(onClick = onClearError) {
+                                Text("Đóng")
+                            }
+                        }
                     }
                 }
             }
 
-            else -> {
-                // Filter list by search query
-                val filteredItems = remember(searchQuery, chatItems) {
-                    if (searchQuery.isBlank()) chatItems
-                    else chatItems.filter {
-                        it.otherUserName.contains(searchQuery, ignoreCase = true)
-                    }
-                }
-
-                if (filteredItems.isEmpty() && !isLoading) {
+            when {
+                isLoading -> {
                     Box(
                         modifier = Modifier.fillMaxSize(),
                         contentAlignment = Alignment.Center
                     ) {
                         Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            modifier = Modifier.padding(32.dp)
+                            horizontalAlignment = Alignment.CenterHorizontally
                         ) {
+                            CircularProgressIndicator()
+                            Spacer(modifier = Modifier.height(16.dp))
                             Text(
-                                text = if (searchQuery.isBlank()) {
-                                    "Chưa có cuộc trò chuyện nào"
-                                } else {
-                                    "Không tìm thấy cuộc trò chuyện phù hợp"
-                                },
-                                color = Color.Gray,
-                                style = MaterialTheme.typography.bodyLarge,
-                                textAlign = TextAlign.Center
+                                text = "Đang tải danh sách chat...",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = Color.Gray
                             )
-                            if (searchQuery.isBlank()) {
-                                Spacer(modifier = Modifier.height(8.dp))
+                        }
+                    }
+                }
+
+                else -> {
+                    // Filter list by search query
+                    val filteredItems = remember(searchQuery, chatItems) {
+                        if (searchQuery.isBlank()) chatItems
+                        else chatItems.filter {
+                            it.otherUserName.contains(searchQuery, ignoreCase = true)
+                        }
+                    }
+
+                    if (filteredItems.isEmpty() && !isLoading) {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                modifier = Modifier.padding(32.dp)
+                            ) {
                                 Text(
-                                    text = "Bắt đầu cuộc trò chuyện mới bằng cách tìm kiếm người dùng",
+                                    text = if (searchQuery.isBlank()) {
+                                        "Chưa có cuộc trò chuyện nào"
+                                    } else {
+                                        "Không tìm thấy cuộc trò chuyện phù hợp"
+                                    },
                                     color = Color.Gray,
-                                    style = MaterialTheme.typography.bodyMedium,
+                                    style = MaterialTheme.typography.bodyLarge,
                                     textAlign = TextAlign.Center
                                 )
-                                Spacer(modifier = Modifier.height(16.dp))
-                                Button(
-                                    onClick = onRetry,
-                                    modifier = Modifier.padding(top = 8.dp)
-                                ) {
-                                    Text("Làm mới")
+                                if (searchQuery.isBlank()) {
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Text(
+                                        text = "Bắt đầu cuộc trò chuyện mới bằng cách tìm kiếm người dùng",
+                                        color = Color.Gray,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        textAlign = TextAlign.Center
+                                    )
+                                    Spacer(modifier = Modifier.height(16.dp))
+                                    Button(
+                                        onClick = onRetry,
+                                        modifier = Modifier.padding(top = 8.dp)
+                                    ) {
+                                        Text("Làm mới")
+                                    }
                                 }
                             }
                         }
-                    }
-                } else {
-                    LazyColumn(
-                        modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(vertical = 8.dp)
-                    ) {
-                        items(filteredItems) { chat ->
-                            ChatListItemView(
-                                chat = chat,
-                                onClick = { onChatClicked(chat.chatId, chat.otherUserId) }
-                            )
-                            if (chat != filteredItems.last()) {
-                                Divider(
-                                    modifier = Modifier.padding(horizontal = 16.dp),
-                                    color = Color.Gray.copy(alpha = 0.3f)
+                    } else {
+                        LazyColumn(
+                            modifier = Modifier.fillMaxSize(),
+                            contentPadding = PaddingValues(vertical = 8.dp)
+                        ) {
+                            items(filteredItems) { chat ->
+                                ChatListItemView(
+                                    chat = chat,
+                                    onClick = { onChatClicked(chat.chatId, chat.otherUserId) }
                                 )
+                                if (chat != filteredItems.last()) {
+                                    Divider(
+                                        modifier = Modifier.padding(horizontal = 16.dp),
+                                        color = Color.Gray.copy(alpha = 0.3f)
+                                    )
+                                }
                             }
                         }
                     }

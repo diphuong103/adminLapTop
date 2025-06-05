@@ -17,7 +17,7 @@
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
-        android:icon="@drawable/_d_computer"
+        android:icon="@drawable/z6636425565387_1eb239eb31f12e878bdd05e13dc21b48"
         android:label="Admin Laptop Store"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"

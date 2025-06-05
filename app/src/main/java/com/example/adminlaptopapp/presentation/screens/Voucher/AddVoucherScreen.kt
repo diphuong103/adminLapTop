@@ -1,5 +1,6 @@
 package com.example.adminlaptopapp.presentation.screens.Voucher
 
+import android.annotation.SuppressLint
 import android.app.DatePickerDialog
 import android.widget.Toast
 import androidx.compose.foundation.clickable
@@ -7,9 +8,12 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.*
+//import androidx.compose.material.*
+import androidx.compose.material3.*
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -25,7 +29,12 @@ import java.text.SimpleDateFormat
 import java.util.*
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberTopAppBarState
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 
+@OptIn(ExperimentalMaterial3Api::class)
+@SuppressLint("UnusedMaterialScaffoldPaddingParameter")
 @Composable
 fun AddVoucherScreen(
     navController: NavController,
@@ -33,6 +42,7 @@ fun AddVoucherScreen(
     viewModel: VouchersViewModel = hiltViewModel()
 ) {
     val context = LocalContext.current
+    val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior(rememberTopAppBarState())
 
     var code by remember { mutableStateOf(existingVoucher?.code ?: "") }
     var description by remember { mutableStateOf(existingVoucher?.description ?: "") }
@@ -44,8 +54,22 @@ fun AddVoucherScreen(
     var oncePerCustomer by remember { mutableStateOf(existingVoucher?.appliesOncePerCustomer ?: false) }
 
     Scaffold(
+        modifier = Modifier
+            .fillMaxSize()
+            .nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
-            TopAppBar(title = { Text(if (existingVoucher != null) "Sửa mã giảm giá" else "Thêm mã giảm giá") })
+            TopAppBar(
+                title = { Text(if (existingVoucher != null) "Sửa mã giảm giá" else "Thêm mã giảm giá") },
+                navigationIcon = {
+                    IconButton(onClick = { navController.popBackStack() }) {
+                        Icon(
+                            Icons.Default.ArrowBack,
+                            contentDescription = "Back"
+                        )
+                    }
+                },
+                scrollBehavior = scrollBehavior
+            )
         },
         floatingActionButton = {
             FloatingActionButton(onClick = {
@@ -71,11 +95,11 @@ fun AddVoucherScreen(
                 Icon(Icons.Default.Check, contentDescription = "Lưu")
             }
         }
-    ) { padding ->
+    ) { innerpadding ->
         Column(
             modifier = Modifier
-                .padding(padding)
                 .padding(16.dp)
+                .padding(innerpadding)
                 .verticalScroll(rememberScrollState())
         ) {
             // ==== Mã & mô tả ====
@@ -100,22 +124,36 @@ fun AddVoucherScreen(
             // ==== Loại giảm giá ====
             Text("Loại giảm giá", style = MaterialTheme.typography.bodyMedium)
             Spacer(modifier = Modifier.height(4.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                RadioButton(
+            Column(
+                verticalArrangement = Arrangement.Center
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    RadioButton(
                     selected = discountType == DiscountType.FIXED_AMOUNT,
                     onClick = { discountType = DiscountType.FIXED_AMOUNT }
-                )
-                Text("Giảm cố định", modifier = Modifier.padding(end = 8.dp))
-                RadioButton(
-                    selected = discountType == DiscountType.PERCENTAGE,
-                    onClick = { discountType = DiscountType.PERCENTAGE }
-                )
-                Text("Giảm %", modifier = Modifier.padding(end = 8.dp))
-                RadioButton(
-                    selected = discountType == DiscountType.FULL_FREE_SHIP,
-                    onClick = { discountType = DiscountType.FULL_FREE_SHIP }
-                )
-                Text("Miễn phí ship")
+                    )
+                    Text("Giảm cố định", modifier = Modifier.padding(end = 8.dp))
+                }
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    RadioButton(
+                        selected = discountType == DiscountType.PERCENTAGE,
+                        onClick = { discountType = DiscountType.PERCENTAGE }
+                    )
+                    Text("Giảm %", modifier = Modifier.padding(end = 8.dp))
+                }
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    RadioButton(
+                        selected = discountType == DiscountType.FULL_FREE_SHIP,
+                        onClick = { discountType = DiscountType.FULL_FREE_SHIP }
+                    )
+                    Text("Miễn phí ship")
+                }
             }
 
             Spacer(modifier = Modifier.height(8.dp))
